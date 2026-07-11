@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Семейное древо</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-tree" viewBox="0 0 24 24">
+        <path d="M12 3v5" />
+        <path d="M6 12h12" />
+        <path d="M6 12v4" />
+        <path d="M18 12v4" />
+        <path d="M12 8v8" />
+        <circle cx="12" cy="5" r="2.5" />
+        <circle cx="6" cy="18" r="2.5" />
+        <circle cx="12" cy="18" r="2.5" />
+        <circle cx="18" cy="18" r="2.5" />
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m16.5 16.5 4 4" />
+      </symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24">
+        <path d="M9 14 4 9l5-5" />
+        <path d="M4 9h10a6 6 0 0 1 0 12h-2" />
+      </symbol>
+      <symbol id="icon-redo" viewBox="0 0 24 24">
+        <path d="m15 14 5-5-5-5" />
+        <path d="M20 9H10a6 6 0 0 0 0 12h2" />
+      </symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24">
+        <path d="M5 4h12l2 2v14H5z" />
+        <path d="M8 4v6h8" />
+        <path d="M8 20v-6h8v6" />
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24">
+        <path d="m5 12 4 4L19 6" />
+      </symbol>
+      <symbol id="icon-fit" viewBox="0 0 24 24">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+        <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+        <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+        <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+      </symbol>
+      <symbol id="icon-minus" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24">
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+      </symbol>
+      <symbol id="icon-upload" viewBox="0 0 24 24">
+        <path d="M12 21V9" />
+        <path d="m7 14 5-5 5 5" />
+        <path d="M5 3h14" />
+      </symbol>
+      <symbol id="icon-card" viewBox="0 0 24 24">
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <circle cx="9" cy="10" r="2" />
+        <path d="M13 10h4" />
+        <path d="M8 15h8" />
+      </symbol>
+      <symbol id="icon-link" viewBox="0 0 24 24">
+        <path d="M8 12h8" />
+        <circle cx="5" cy="12" r="3" />
+        <circle cx="19" cy="12" r="3" />
+      </symbol>
+      <symbol id="icon-eraser" viewBox="0 0 24 24">
+        <path d="m7 21-4-4 10-10 6 6-8 8z" />
+        <path d="m14 6 4-4 4 4-4 4" />
+        <path d="M12 21h9" />
+      </symbol>
+      <symbol id="icon-frame" viewBox="0 0 24 24">
+        <rect x="5" y="5" width="14" height="14" rx="1" />
+        <path d="M9 3v4" />
+        <path d="M15 17v4" />
+        <path d="M3 9h4" />
+        <path d="M17 15h4" />
+      </symbol>
+      <symbol id="icon-lasso" viewBox="0 0 24 24">
+        <path d="M7 17c-3-2-4-6-1-9 3-4 11-4 14 0 3 4 0 9-6 9H9" />
+        <path d="M9 17c1 3 4 4 7 3" />
+      </symbol>
+      <symbol id="icon-target" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3" />
+        <path d="M12 19v3" />
+        <path d="M2 12h3" />
+        <path d="M19 12h3" />
+      </symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <circle cx="12" cy="5" r="1.5" />
+        <circle cx="12" cy="12" r="1.5" />
+        <circle cx="12" cy="19" r="1.5" />
+      </symbol>
+      <symbol id="icon-user-plus" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="4" />
+        <path d="M3 21a6 6 0 0 1 12 0" />
+        <path d="M19 8v6" />
+        <path d="M16 11h6" />
+      </symbol>
+      <symbol id="icon-child" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M6 21v-3a6 6 0 0 1 12 0v3" />
+        <path d="M8 13h8" />
+      </symbol>
+      <symbol id="icon-heart" viewBox="0 0 24 24">
+        <path d="M20 8.5c0 5.5-8 10.5-8 10.5S4 14 4 8.5A4.5 4.5 0 0 1 12 5a4.5 4.5 0 0 1 8 3.5z" />
+      </symbol>
+      <symbol id="icon-users" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3" />
+        <circle cx="17" cy="10" r="3" />
+        <path d="M3 20a6 6 0 0 1 12 0" />
+        <path d="M14 19a5 5 0 0 1 7 0" />
+      </symbol>
+      <symbol id="icon-palette" viewBox="0 0 24 24">
+        <path d="M12 3a9 9 0 0 0 0 18h1.5a2 2 0 0 0 1.4-3.4 1.6 1.6 0 0 1 1.1-2.7H18a6 6 0 0 0 0-12z" />
+        <circle cx="7.5" cy="11" r="1" />
+        <circle cx="10" cy="7.5" r="1" />
+        <circle cx="14.5" cy="7.5" r="1" />
+      </symbol>
+      <symbol id="icon-tag" viewBox="0 0 24 24">
+        <path d="M20 12 12 20 4 12V4h8z" />
+        <circle cx="9" cy="9" r="1.5" />
+      </symbol>
+      <symbol id="icon-layout" viewBox="0 0 24 24">
+        <rect x="4" y="3" width="6" height="5" rx="1" />
+        <rect x="14" y="3" width="6" height="5" rx="1" />
+        <rect x="9" y="16" width="6" height="5" rx="1" />
+        <path d="M7 8v3h10V8" />
+        <path d="M12 11v5" />
+      </symbol>
+      <symbol id="icon-copy" viewBox="0 0 24 24">
+        <rect x="8" y="8" width="11" height="11" rx="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+      </symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24">
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      </symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8" cy="10" r="2" />
+        <path d="m21 15-5-5L5 19" />
+      </symbol>
+      <symbol id="icon-file" viewBox="0 0 24 24">
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v5h5" />
+      </symbol>
+      <symbol id="icon-eye" viewBox="0 0 24 24">
+        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="icon-eye-off" viewBox="0 0 24 24">
+        <path d="M3 3l18 18" />
+        <path d="M10.6 10.6A2 2 0 0 0 13.4 13.4" />
+        <path d="M9.9 4.4A9.8 9.8 0 0 1 12 4c6 0 10 8 10 8a17.4 17.4 0 0 1-2.1 3.1" />
+        <path d="M6.6 6.6C3.8 8.5 2 12 2 12s4 8 10 8a9.7 9.7 0 0 0 4.1-.9" />
+      </symbol>
+      <symbol id="icon-x" viewBox="0 0 24 24">
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </symbol>
+    </svg>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><svg class="ui-icon"><use href="#icon-tree"></use></svg></span>
+          <div>
+            <h1>Семейное древо</h1>
+            <p id="treeStats">0 человек</p>
+          </div>
+        </div>
+
+        <div class="top-actions">
+          <label class="search">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+            <input id="searchInput" type="search" placeholder="ФИО, дата, место" list="searchSuggestions" autocomplete="off" />
+            <datalist id="searchSuggestions"></datalist>
+          </label>
+          <button id="undoBtn" class="icon-button" title="Отменить" aria-label="Отменить"><svg class="ui-icon" aria-hidden="true"><use href="#icon-undo"></use></svg></button>
+          <button id="redoBtn" class="icon-button" title="Вернуть" aria-label="Вернуть"><svg class="ui-icon" aria-hidden="true"><use href="#icon-redo"></use></svg></button>
+          <button id="saveTreeBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-save"></use></svg><span>Сохранить</span></button>
+          <button id="autoLayoutBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-layout"></use></svg><span>Упорядочить</span></button>
+          <button id="fitBtn" class="icon-button" title="Показать всё" aria-label="Показать всё"><svg class="ui-icon" aria-hidden="true"><use href="#icon-fit"></use></svg></button>
+          <button id="zoomOutBtn" class="icon-button" title="Уменьшить" aria-label="Уменьшить"><svg class="ui-icon" aria-hidden="true"><use href="#icon-minus"></use></svg></button>
+          <button id="zoomInBtn" class="icon-button" title="Увеличить" aria-label="Увеличить"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg></button>
+          <label class="top-switch" title="Защита от случайных изменений">
+            <input id="editLockInput" type="checkbox" />
+            <span><svg class="ui-icon" aria-hidden="true"><use href="#icon-lock"></use></svg>Защита</span>
+          </label>
+          <button id="toggleHistoryBtn" class="icon-button" title="Показать/скрыть историю" aria-label="Показать/скрыть историю"><svg class="ui-icon" aria-hidden="true"><use href="#icon-eye"></use></svg></button>
+          <button id="openInspectorBtn" class="icon-button" title="Показать боковую панель" aria-label="Показать боковую панель"><svg class="ui-icon" aria-hidden="true"><use href="#icon-card"></use></svg></button>
+          <select id="themeSelect" class="compact-select" title="Тема оформления" aria-label="Тема оформления">
+            <option value="light">Светлая</option>
+            <option value="dark">Тёмная</option>
+            <option value="print">Печатная</option>
+          </select>
+          <button id="printModeBtn" class="icon-button" title="Режим печати" aria-label="Режим печати"><svg class="ui-icon" aria-hidden="true"><use href="#icon-file"></use></svg></button>
+          <button id="exportBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-download"></use></svg><span>JSON</span></button>
+          <button id="exportGedcomBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-file"></use></svg><span>GEDCOM</span></button>
+          <button id="exportImageBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg><span>PNG</span></button>
+          <label class="text-button file-action">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-upload"></use></svg>
+            <span>Импорт</span>
+            <input id="importInput" type="file" accept=".json,.ged,.gedcom,application/json,text/plain" />
+          </label>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="tree-panel" aria-label="Поле семейного дерева">
+          <div class="tree-hint">
+            <span>Карточки цепляются к сетке, линии можно проводить вручную</span>
+          </div>
+          <div class="tool-rail" aria-label="Быстрые инструменты">
+            <div class="tool-section">
+              <span class="tool-section-title">Карточки</span>
+              <button id="quickAddBtn" class="tool-button" type="button" title="Добавить пустую карточку">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-card"></use></svg>
+                <small>Карточка</small>
+              </button>
+              <button id="colorByNameBtn" class="tool-button" type="button" title="Авто цвет выбранных карточек по ФИО">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg>
+                <small>ФИО цвет</small>
+              </button>
+              <button id="colorBySurnameBtn" class="tool-button" type="button" title="Авто цвет выбранных карточек по фамилии">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-tag"></use></svg>
+                <small>Фамилия</small>
+              </button>
+            </div>
+            <div class="tool-section">
+              <span class="tool-section-title">Связи</span>
+              <button id="drawLineBtn" class="tool-button" type="button" title="Провести линию между двумя карточками">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-link"></use></svg>
+                <small>Линия</small>
+              </button>
+              <label class="tool-select">
+                <span>Тип</span>
+                <select id="linkTypeSelect">
+                  <option value="parent">Родительская</option>
+                  <option value="family">Родственная</option>
+                  <option value="sibling">Братская</option>
+                </select>
+              </label>
+              <button id="eraseLineBtn" class="tool-button" type="button" title="Удалить связь между двумя карточками">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-eraser"></use></svg>
+                <small>Убрать</small>
+              </button>
+            </div>
+            <div class="tool-section">
+              <span class="tool-section-title">Выделение</span>
+              <button id="rectSelectBtn" class="tool-button" type="button" title="Прямоугольное выделение">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-frame"></use></svg>
+                <small>Рамка</small>
+              </button>
+              <button id="freeSelectBtn" class="tool-button" type="button" title="Свободное выделение">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-lasso"></use></svg>
+                <small>Лассо</small>
+              </button>
+            </div>
+            <p id="modeStatus" class="tool-status">Выбор</p>
+          </div>
+          <div class="admin-panel" aria-label="Админ-панель">
+            <div class="admin-panel-header">
+              <p class="eyebrow">Админ</p>
+              <button id="toggleAdminBtn" class="mini-icon-button" type="button" title="Свернуть админ-панель" aria-label="Свернуть админ-панель">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-minus"></use></svg>
+              </button>
+            </div>
+            <div class="admin-section">
+              <span class="tool-section-title">Карточка</span>
+              <button id="duplicatePersonBtn" class="tool-button" type="button" title="Дублировать выбранную карточку">
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-copy"></use></svg>
+                <small>Дубликат</small>
+              </button>
+            </div>
+            <div class="admin-section">
+              <span class="tool-section-title">Поколения</span>
+              <label class="switch-row compact-switch">
+                <input id="guideVisibleInput" type="checkbox" checked />
+                <span>Показывать линии</span>
+              </label>
+              <div class="admin-two-cols">
+                <button id="guideLineBtn" class="tool-button" type="button" title="Цветная направляющая по сетке">
+                  <svg class="ui-icon" aria-hidden="true"><use href="#icon-frame"></use></svg>
+                  <small>Линия</small>
+                </button>
+                <button id="guideEraseBtn" class="tool-button" type="button" title="Стереть направляющую">
+                  <svg class="ui-icon" aria-hidden="true"><use href="#icon-eraser"></use></svg>
+                  <small>Ластик</small>
+                </button>
+              </div>
+              <label class="tool-select">
+                <span>Ось</span>
+                <select id="guideAxisSelect">
+                  <option value="h">Горизонталь</option>
+                  <option value="v">Вертикаль</option>
+                </select>
+              </label>
+              <label class="tool-color" title="Цвет направляющей">
+                <span>Цвет</span>
+                <input id="guideColorInput" type="color" value="#2f7d75" />
+              </label>
+              <label class="tool-input">
+                <span>Подпись</span>
+                <input id="guideLabelInput" type="text" placeholder="Поколение" maxlength="32" />
+              </label>
+            </div>
+            <div class="admin-section">
+              <span class="tool-section-title">Связи</span>
+              <label class="tool-select">
+                <span>Родитель - ребёнок</span>
+                <select id="parentLineModeSelect">
+                  <option value="smart">Обычный режим</option>
+                  <option value="vertical">Только сверху/снизу</option>
+                </select>
+              </label>
+            </div>
+            <div class="admin-section">
+              <span class="tool-section-title">Ветка</span>
+              <label class="tool-select">
+                <span>Показать</span>
+                <select id="branchModeSelect">
+                  <option value="all">Всё дерево</option>
+                  <option value="ancestors">Предки</option>
+                  <option value="descendants">Потомки</option>
+                  <option value="near">Близкие</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="history-panel tree-history-panel">
+            <div class="history-header">
+              <p class="eyebrow">История</p>
+              <span id="undoRedoHint" class="history-hint"></span>
+              <button id="hideHistoryBtn" class="mini-icon-button" type="button" title="Скрыть историю" aria-label="Скрыть историю"><svg class="ui-icon" aria-hidden="true"><use href="#icon-eye-off"></use></svg></button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+          </div>
+          <div id="treeViewport" class="tree-viewport">
+            <div id="treeSurface" class="tree-surface">
+              <svg id="guideLayer" class="guide-layer" aria-hidden="true"></svg>
+              <svg id="selectionLayer" class="selection-layer" aria-hidden="true"></svg>
+              <svg id="linkLayer" class="link-layer" aria-hidden="true"></svg>
+              <div id="nodeLayer" class="node-layer"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="inspector" aria-label="Редактор человека">
+          <div class="inspector-header">
+            <div>
+              <p class="eyebrow">Выбранный человек</p>
+              <h2 id="selectedTitle">Анкета</h2>
+            </div>
+            <button id="closeInspectorBtn" class="icon-button" title="Закрыть боковую панель" aria-label="Закрыть боковую панель"><svg class="ui-icon" aria-hidden="true"><use href="#icon-x"></use></svg></button>
+            <button id="setRootBtn" class="icon-button" title="Сделать центром дерева" aria-label="Сделать центром дерева"><svg class="ui-icon" aria-hidden="true"><use href="#icon-target"></use></svg></button>
+          </div>
+
+          <form id="personForm" class="person-form">
+            <div class="photo-editor">
+              <button id="photoButton" class="photo-preview" type="button" title="Загрузить фото">
+                <span id="photoInitials">?</span>
+                <img id="photoImage" alt="" />
+              </button>
+              <div>
+                <label class="text-button file-action">
+                  Загрузить фото
+                  <input id="photoInput" type="file" accept="image/*" />
+                </label>
+                <button id="removePhotoBtn" class="ghost-button" type="button">Убрать</button>
+              </div>
+            </div>
+
+            <label>
+              Имя
+              <input id="nameInput" name="name" type="text" autocomplete="off" />
+            </label>
+
+            <div class="date-editor">
+              <p class="field-title">Родился/родилась</p>
+              <div class="date-grid">
+                <label>
+                  День
+                  <input id="bornDayInput" name="bornDay" type="number" min="1" max="31" placeholder="ДД" />
+                </label>
+                <label>
+                  Месяц
+                  <input id="bornMonthInput" name="bornMonth" type="number" min="1" max="12" placeholder="ММ" />
+                </label>
+                <label>
+                  Год
+                  <input id="bornYearInput" name="bornYear" type="number" min="1" max="9999" placeholder="ГГГГ" />
+                </label>
+              </div>
+            </div>
+
+            <div class="age-panel">
+              <div>
+                <span>Возраст</span>
+                <strong id="ageSummary">—</strong>
+              </div>
+              <div>
+                <span>До дня рождения</span>
+                <strong id="birthdayCountdown">—</strong>
+              </div>
+            </div>
+
+            <div class="date-editor">
+              <p class="field-title">Ушёл/ушла</p>
+              <div class="date-grid">
+                <label>
+                  День
+                  <input id="diedDayInput" name="diedDay" type="number" min="1" max="31" placeholder="ДД" />
+                </label>
+                <label>
+                  Месяц
+                  <input id="diedMonthInput" name="diedMonth" type="number" min="1" max="12" placeholder="ММ" />
+                </label>
+                <label>
+                  Год
+                  <input id="diedYearInput" name="diedYear" type="number" min="1" max="9999" placeholder="ГГГГ" />
+                </label>
+              </div>
+            </div>
+
+            <label>
+              Место
+              <input id="placeInput" name="place" type="text" placeholder="город, страна" />
+            </label>
+
+            <label>
+              Заметки
+              <textarea id="notesInput" name="notes" rows="4" placeholder="истории, факты, важные даты"></textarea>
+            </label>
+
+            <fieldset class="color-panel">
+              <legend>Ручной цвет</legend>
+              <button id="manualColorModeBtn" class="ghost-button" type="button">Включить ручной режим</button>
+              <label class="color-picker-row">
+                <span id="colorValueLabel">#f2d16b</span>
+                <input id="cardColorPicker" type="color" value="#f2d16b" />
+              </label>
+            </fieldset>
+
+            <label class="switch-row">
+              <input id="pinCardInput" type="checkbox" />
+              <span>Закрепить карточку</span>
+            </label>
+          </form>
+
+          <div class="kinship-panel">
+            <p class="eyebrow">Связи</p>
+            <div id="kinshipSummary" class="kinship-summary"></div>
+          </div>
+
+          <div class="validation-panel">
+            <p class="eyebrow">Проверки</p>
+            <div id="validationList" class="validation-list"></div>
+          </div>
+
+          <div class="danger-zone">
+            <button id="deletePersonBtn" class="danger-button" type="button">Удалить человека</button>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <div id="photoModal" class="photo-modal" hidden>
+      <button id="closePhotoModalBtn" class="photo-modal-close" type="button" aria-label="Закрыть просмотр фото">×</button>
+      <img id="photoModalImage" alt="" />
+    </div>
+
+    <div id="printControls" class="print-controls" hidden>
+      <label>
+        Масштаб
+        <input id="printScaleInput" type="range" min="55" max="130" value="100" />
+      </label>
+      <button id="exitPrintModeBtn" class="ghost-button" type="button">Выйти</button>
+    </div>
+
+    <script src="./tree-layout.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

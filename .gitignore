@@ -1,0 +1,10 @@
+family-tree-*.json
+family-tree-*.ged
+family-tree-*.gedcom
+family-tree-*.png
+*.bak
+*.backup
+*.tmp
+.DS_Store
+Thumbs.db
+.git.broken/
