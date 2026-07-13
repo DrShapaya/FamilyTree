@@ -105,6 +105,32 @@ For a permanent custom domain, create a named Cloudflare Tunnel in your Cloudfla
 http://127.0.0.1:8765
 ```
 
+For this project, the prepared permanent address is:
+
+```text
+https://tree.drshapaya.ru
+```
+
+After adding `drshapaya.ru` to Cloudflare and changing the domain nameservers at the registrar, run:
+
+```powershell
+.\scripts\setup-cloudflare-named-tunnel.ps1
+```
+
+Then start the permanent tunnel with:
+
+```powershell
+.\scripts\start-cloudflare-named-tunnel.ps1
+```
+
+The permanent tunnel uses local port `8785`, so it does not conflict with temporary local servers on `8765`.
+
+No Windows service or autorun is required. Start the tunnel manually when you need public access by double-clicking:
+
+```text
+Start FamilyTree Permanent Tunnel.cmd
+```
+
 ## Privacy
 
 Personal tree data is stored in the browser using IndexedDB. It is not stored in this Git repository.
