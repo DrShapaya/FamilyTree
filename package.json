@@ -10,6 +10,7 @@
     "tunnel": "powershell -ExecutionPolicy Bypass -File scripts/start-cloudflare-tunnel.ps1"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "ws": "^8.21.0"
   }
 }

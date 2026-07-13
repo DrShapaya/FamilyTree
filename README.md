@@ -63,7 +63,7 @@ For access from a different network, use Cloudflare Tunnel as described below. I
 
 Without the server, the app still works fully offline using the browser's IndexedDB storage.
 
-Sync is local-first and merge-aware. If two devices add or move different cards at the same time, the server merges those changes instead of replacing the whole tree with the last saved copy. If two devices edit the same card field at the same time, the later synced edit wins for that field.
+Sync is local-first, operation-based, and WebSocket-assisted. The browser sends concrete changes such as card upserts, card moves, link changes, guide changes, and settings patches; the server applies them and broadcasts them to other connected devices in real time. If two devices add or move different cards at the same time, the server merges those changes instead of replacing the whole tree with the last saved copy. If two devices edit the same card field at the same time, the later synced edit wins for that field.
 
 ## Public Access With Cloudflare Tunnel
 

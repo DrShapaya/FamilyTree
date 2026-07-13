@@ -1,7 +1,9 @@
 const crypto = require("crypto");
 const fs = require("fs/promises");
+const http = require("http");
 const path = require("path");
 const express = require("express");
+const { WebSocketServer, WebSocket } = require("ws");
 
 const PORT = Number(process.env.PORT || 8765);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -14,6 +16,9 @@ const MAX_OPERATIONS = 5000;
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
+const server = http.createServer(app);
+const wss = new WebSocketServer({ noServer: true });
+const treeSockets = new Map();
 
 function slugifyTreeName(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -209,6 +214,121 @@ function mergeStateChanges(currentState, baseState, nextState) {
   return merged;
 }
 
+function cleanStateReferences(nextState) {
+  const state = cloneJson(nextState);
+  state.people ||= {};
+  state.links = (Array.isArray(state.links) ? state.links : []).filter((link) => state.people?.[link.from] && state.people?.[link.to]);
+  state.positions ||= {};
+  Object.keys(state.positions).forEach((id) => {
+    if (!state.people?.[id]) delete state.positions[id];
+  });
+  if (!state.people?.[state.rootId]) state.rootId = Object.keys(state.people)[0] || "";
+  if (!state.people?.[state.selectedId]) state.selectedId = state.rootId;
+  state.guides = Array.isArray(state.guides) ? state.guides : [];
+  state.settings ||= {};
+  state.history = Array.isArray(state.history) ? state.history.slice(0, 30) : [];
+  return state;
+}
+
+function upsertById(items = [], value) {
+  const id = String(value?.id || "");
+  if (!id) return Array.isArray(items) ? items : [];
+  const next = Array.isArray(items) ? [...items] : [];
+  const index = next.findIndex((item) => String(item?.id || "") === id);
+  if (index >= 0) next[index] = cloneJson(value);
+  else next.push(cloneJson(value));
+  return next;
+}
+
+function removeById(items = [], id) {
+  return (Array.isArray(items) ? items : []).filter((item) => String(item?.id || "") !== String(id || ""));
+}
+
+function applySyncOperations(currentState, operations = []) {
+  const nextState = cleanStateReferences(currentState);
+  for (const operation of Array.isArray(operations) ? operations : []) {
+    const kind = String(operation?.kind || "");
+    const id = String(operation?.id || operation?.value?.id || "");
+    if (kind === "person.upsert" && id && operation.value) {
+      nextState.people[id] = cloneJson(operation.value);
+    } else if (kind === "person.delete" && id) {
+      delete nextState.people[id];
+      delete nextState.positions[id];
+      nextState.links = removeById(nextState.links, "").filter((link) => link.from !== id && link.to !== id);
+    } else if (kind === "position.set" && id && operation.value) {
+      nextState.positions[id] = cloneJson(operation.value);
+    } else if (kind === "position.delete" && id) {
+      delete nextState.positions[id];
+    } else if (kind === "link.upsert" && id && operation.value) {
+      nextState.links = upsertById(nextState.links, operation.value);
+    } else if (kind === "link.delete" && id) {
+      nextState.links = removeById(nextState.links, id);
+    } else if (kind === "guide.upsert" && id && operation.value) {
+      nextState.guides = upsertById(nextState.guides, operation.value);
+    } else if (kind === "guide.delete" && id) {
+      nextState.guides = removeById(nextState.guides, id);
+    } else if (kind === "settings.patch" && operation.value && typeof operation.value === "object") {
+      nextState.settings = { ...(nextState.settings || {}), ...cloneJson(operation.value) };
+    } else if (kind === "root.set" && operation.value) {
+      nextState.rootId = String(operation.value);
+    } else if (kind === "selected.set" && operation.value) {
+      nextState.selectedId = String(operation.value);
+    } else if (kind === "history.prepend" && operation.value) {
+      nextState.history = mergeHistory(nextState.history, [operation.value]);
+    } else if (kind === "state.replace" && operation.value && typeof operation.value === "object") {
+      return cleanStateReferences(operation.value);
+    }
+  }
+  return cleanStateReferences(nextState);
+}
+
+function compactSyncOperations(operations = []) {
+  return (Array.isArray(operations) ? operations : [])
+    .slice(0, 500)
+    .map((operation) => ({
+      kind: String(operation?.kind || "").slice(0, 80),
+      id: String(operation?.id || operation?.value?.id || "").slice(0, 120),
+      value: cloneJson(operation?.value),
+    }))
+    .filter((operation) => operation.kind);
+}
+
+function socketsForTree(treeId) {
+  if (!treeSockets.has(treeId)) treeSockets.set(treeId, new Set());
+  return treeSockets.get(treeId);
+}
+
+function broadcastTree(treeId, message) {
+  const payload = JSON.stringify(message);
+  for (const socket of socketsForTree(treeId)) {
+    if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+  }
+}
+
+server.on("upgrade", async (req, socket, head) => {
+  try {
+    const requestUrl = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+    if (requestUrl.pathname !== "/api/sync/ws") {
+      socket.destroy();
+      return;
+    }
+    const payload = await verifyToken(requestUrl.searchParams.get("token") || "");
+    if (!payload) {
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      ws.auth = payload;
+      socketsForTree(payload.treeId).add(ws);
+      ws.send(JSON.stringify({ type: "sync.ready", treeId: payload.treeId }));
+      ws.on("close", () => socketsForTree(payload.treeId).delete(ws));
+      ws.on("error", () => socketsForTree(payload.treeId).delete(ws));
+    });
+  } catch {
+    socket.destroy();
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, sync: true });
 });
@@ -271,8 +391,11 @@ app.post("/api/sync/push", authRequired, async (req, res) => {
   if (!alreadyApplied) {
     const baseVersion = Number(operation.baseVersion || 0);
     const hasMergeBase = operation.baseState && typeof operation.baseState === "object";
+    const syncOperations = compactSyncOperations(operation.ops);
     const nextState =
-      hasMergeBase && baseVersion < Number(tree.version || 0)
+      syncOperations.length
+        ? applySyncOperations(tree.state, syncOperations)
+        : hasMergeBase && baseVersion < Number(tree.version || 0)
         ? mergeStateChanges(tree.state, operation.baseState, operation.state)
         : operation.state;
     tree.version += 1;
@@ -286,6 +409,7 @@ app.post("/api/sync/push", authRequired, async (req, res) => {
       label: String(operation.label || "Изменение").slice(0, 200),
       detail: String(operation.detail || "").slice(0, 400),
       baseVersion,
+      ops: syncOperations,
       merged: hasMergeBase && baseVersion < Number(tree.version - 1),
       createdAt: operation.createdAt || new Date().toISOString(),
     });
@@ -293,6 +417,13 @@ app.post("/api/sync/push", authRequired, async (req, res) => {
       tree.operations = tree.operations.slice(-MAX_OPERATIONS);
     }
     await writeTree(tree);
+    broadcastTree(tree.id, {
+      type: "sync.operation",
+      treeId: tree.id,
+      version: tree.version,
+      state: tree.state,
+      operation: tree.operations[tree.operations.length - 1],
+    });
   }
 
   res.json(publicTree(tree));
@@ -314,7 +445,7 @@ app.use(express.static(ROOT, {
   index: "index.html",
 }));
 
-app.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, () => {
   console.log(`FamilyTree server: http://127.0.0.1:${PORT}`);
   console.log(`LAN access: use this computer's local IP on port ${PORT}`);
   console.log(`Storage directory: ${DATA_DIR}`);

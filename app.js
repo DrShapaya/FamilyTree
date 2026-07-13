@@ -157,6 +157,9 @@ let applyingRemoteState = false;
 let syncDebounceTimer = null;
 let pendingSyncReason = "";
 let lastSyncedSnapshot = "";
+let syncSocket = null;
+let syncSocketReconnectTimer = null;
+let syncSocketReconnectAttempts = 0;
 
 function makeId(prefix = "p") {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -390,6 +393,134 @@ function mergeStateChanges(currentState, baseState, nextState) {
   return merged;
 }
 
+function mapById(items = []) {
+  return new Map(
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item && item.id)
+      .map((item) => [String(item.id), item]),
+  );
+}
+
+function diffObjectMapOperations(kindBase, baseMap = {}, nextMap = {}) {
+  const operations = [];
+  const ids = new Set([...Object.keys(baseMap || {}), ...Object.keys(nextMap || {})]);
+  ids.forEach((id) => {
+    const baseHas = Object.prototype.hasOwnProperty.call(baseMap, id);
+    const nextHas = Object.prototype.hasOwnProperty.call(nextMap, id);
+    if (baseHas && !nextHas) operations.push({ kind: `${kindBase}.delete`, id });
+    else if (nextHas && !sameStateValue(baseMap?.[id], nextMap?.[id])) operations.push({ kind: `${kindBase}.upsert`, id, value: cloneStateValue(nextMap[id]) });
+  });
+  return operations;
+}
+
+function diffArrayOperations(kindBase, baseItems = [], nextItems = []) {
+  const operations = [];
+  const baseMap = mapById(baseItems);
+  const nextMap = mapById(nextItems);
+  const ids = new Set([...baseMap.keys(), ...nextMap.keys()]);
+  ids.forEach((id) => {
+    const baseHas = baseMap.has(id);
+    const nextHas = nextMap.has(id);
+    if (baseHas && !nextHas) operations.push({ kind: `${kindBase}.delete`, id });
+    else if (nextHas && !sameStateValue(baseMap.get(id), nextMap.get(id))) operations.push({ kind: `${kindBase}.upsert`, id, value: cloneStateValue(nextMap.get(id)) });
+  });
+  return operations;
+}
+
+function diffSettingsOperations(baseSettings = {}, nextSettings = {}) {
+  const patch = {};
+  const keys = new Set([...Object.keys(baseSettings || {}), ...Object.keys(nextSettings || {})]);
+  keys.forEach((key) => {
+    if (!sameStateValue(baseSettings?.[key], nextSettings?.[key])) patch[key] = cloneStateValue(nextSettings[key]);
+  });
+  return Object.keys(patch).length ? [{ kind: "settings.patch", value: patch }] : [];
+}
+
+function diffHistoryOperations(baseHistory = [], nextHistory = []) {
+  const baseIds = new Set((Array.isArray(baseHistory) ? baseHistory : []).map((item) => String(item?.id || "")));
+  return (Array.isArray(nextHistory) ? nextHistory : [])
+    .filter((item) => item?.id && !baseIds.has(String(item.id)))
+    .slice(0, 10)
+    .reverse()
+    .map((item) => ({ kind: "history.prepend", id: item.id, value: cloneStateValue(item) }));
+}
+
+function buildSyncOperations(baseState, nextState) {
+  const base = cloneStateValue(baseState);
+  const next = cloneStateValue(nextState);
+  const operations = [
+    ...diffObjectMapOperations("person", base.people, next.people),
+    ...diffObjectMapOperations("position", base.positions, next.positions).map((operation) =>
+      operation.kind === "position.upsert" ? { ...operation, kind: "position.set" } : { ...operation, kind: "position.delete" },
+    ),
+    ...diffArrayOperations("link", base.links, next.links),
+    ...diffArrayOperations("guide", base.guides, next.guides),
+    ...diffSettingsOperations(base.settings, next.settings),
+  ];
+  if (!sameStateValue(base.rootId, next.rootId)) operations.push({ kind: "root.set", value: next.rootId });
+  if (!sameStateValue(base.selectedId, next.selectedId)) operations.push({ kind: "selected.set", value: next.selectedId });
+  operations.push(...diffHistoryOperations(base.history, next.history));
+  return operations;
+}
+
+function upsertArrayItem(items = [], value) {
+  const id = String(value?.id || "");
+  if (!id) return Array.isArray(items) ? items : [];
+  const next = Array.isArray(items) ? [...items] : [];
+  const index = next.findIndex((item) => String(item?.id || "") === id);
+  if (index >= 0) next[index] = cloneStateValue(value);
+  else next.push(cloneStateValue(value));
+  return next;
+}
+
+function removeArrayItem(items = [], id) {
+  return (Array.isArray(items) ? items : []).filter((item) => String(item?.id || "") !== String(id || ""));
+}
+
+function applySyncOperations(currentState, operations = []) {
+  const nextState = cloneStateValue(currentState);
+  nextState.people ||= {};
+  nextState.positions ||= {};
+  nextState.links = Array.isArray(nextState.links) ? nextState.links : [];
+  nextState.guides = Array.isArray(nextState.guides) ? nextState.guides : [];
+  nextState.settings ||= {};
+  nextState.history = Array.isArray(nextState.history) ? nextState.history : [];
+  for (const operation of Array.isArray(operations) ? operations : []) {
+    const kind = String(operation?.kind || "");
+    const id = String(operation?.id || operation?.value?.id || "");
+    if (kind === "person.upsert" && id && operation.value) {
+      nextState.people[id] = cloneStateValue(operation.value);
+    } else if (kind === "person.delete" && id) {
+      delete nextState.people[id];
+      delete nextState.positions[id];
+      nextState.links = nextState.links.filter((link) => link.from !== id && link.to !== id);
+    } else if (kind === "position.set" && id && operation.value) {
+      nextState.positions[id] = cloneStateValue(operation.value);
+    } else if (kind === "position.delete" && id) {
+      delete nextState.positions[id];
+    } else if (kind === "link.upsert" && id && operation.value) {
+      nextState.links = upsertArrayItem(nextState.links, operation.value);
+    } else if (kind === "link.delete" && id) {
+      nextState.links = removeArrayItem(nextState.links, id);
+    } else if (kind === "guide.upsert" && id && operation.value) {
+      nextState.guides = upsertArrayItem(nextState.guides, operation.value);
+    } else if (kind === "guide.delete" && id) {
+      nextState.guides = removeArrayItem(nextState.guides, id);
+    } else if (kind === "settings.patch" && operation.value && typeof operation.value === "object") {
+      nextState.settings = { ...nextState.settings, ...cloneStateValue(operation.value) };
+    } else if (kind === "root.set") {
+      nextState.rootId = String(operation.value || "");
+    } else if (kind === "selected.set") {
+      nextState.selectedId = String(operation.value || "");
+    } else if (kind === "history.prepend" && operation.value) {
+      nextState.history = mergeHistory(nextState.history, [operation.value]);
+    } else if (kind === "state.replace" && operation.value && typeof operation.value === "object") {
+      return normalizeState(cloneStateValue(operation.value));
+    }
+  }
+  return normalizeState(nextState);
+}
+
 function updateSyncStatus(text = "") {
   if (!els.syncStatusLabel) return;
   const label = text || (syncSettings.token ? `Синхр: ${syncSettings.treeName}` : "Локально");
@@ -432,6 +563,111 @@ async function syncFetch(pathname, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
   return data;
+}
+
+function syncWebSocketUrl() {
+  const base = syncBaseUrl();
+  const url = new URL(base);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/api/sync/ws";
+  url.search = "";
+  url.searchParams.set("token", syncSettings.token);
+  return url.toString();
+}
+
+function stopSyncSocket() {
+  window.clearTimeout(syncSocketReconnectTimer);
+  syncSocketReconnectTimer = null;
+  if (syncSocket) {
+    syncSocket.onclose = null;
+    syncSocket.close();
+  }
+  syncSocket = null;
+}
+
+function scheduleSyncSocketReconnect() {
+  if (!syncSettings.token) return;
+  window.clearTimeout(syncSocketReconnectTimer);
+  const delay = Math.min(15000, 1000 * 2 ** Math.min(syncSocketReconnectAttempts, 4));
+  syncSocketReconnectAttempts += 1;
+  syncSocketReconnectTimer = window.setTimeout(startSyncSocket, delay);
+}
+
+function startSyncSocket() {
+  stopSyncSocket();
+  if (!syncSettings.token || !("WebSocket" in window)) return;
+  try {
+    syncSocket = new WebSocket(syncWebSocketUrl());
+  } catch (error) {
+    console.warn("Не удалось открыть WebSocket", error);
+    scheduleSyncSocketReconnect();
+    return;
+  }
+  syncSocket.onopen = () => {
+    syncSocketReconnectAttempts = 0;
+    updateSyncStatus();
+  };
+  syncSocket.onmessage = (event) => {
+    try {
+      handleSyncSocketMessage(JSON.parse(event.data));
+    } catch (error) {
+      console.warn("Некорректное WebSocket-сообщение", error);
+    }
+  };
+  syncSocket.onerror = () => updateSyncStatus("Офлайн");
+  syncSocket.onclose = () => {
+    syncSocket = null;
+    scheduleSyncSocketReconnect();
+  };
+}
+
+function applyRemoteStateSnapshot(remoteState, reason = "sync-remote") {
+  applyingRemoteState = true;
+  state = normalizeState(remoteState);
+  lastStateSnapshot = serializeState();
+  persistState(lastStateSnapshot, { reason });
+  applyingRemoteState = false;
+  applyTheme();
+  applyPrintScale();
+  render();
+}
+
+function applyRemoteOperationMessage(message) {
+  const nextVersion = Number(message.version || 0);
+  if (!nextVersion || nextVersion <= Number(syncSettings.version || 0)) return;
+  const operation = message.operation || {};
+  const localSnapshot = serializeState();
+  const hasLocalChanges = Boolean(lastSyncedSnapshot) && localSnapshot !== lastSyncedSnapshot;
+  applyingRemoteState = true;
+  if (hasLocalChanges && message.state) {
+    state = normalizeState(mergeStateChanges(message.state, JSON.parse(lastSyncedSnapshot), JSON.parse(localSnapshot)));
+  } else if (Array.isArray(operation.ops) && operation.ops.length) {
+    state = applySyncOperations(state, operation.ops);
+  } else if (message.state) {
+    state = normalizeState(mergeStateChanges(message.state, lastSyncedSnapshot ? JSON.parse(lastSyncedSnapshot) : state, state));
+  }
+  lastStateSnapshot = serializeState();
+  if (message.state) lastSyncedSnapshot = JSON.stringify(normalizeState(cloneStateValue(message.state)));
+  else lastSyncedSnapshot = lastStateSnapshot;
+  persistState(lastStateSnapshot, { reason: "sync-ws" });
+  applyingRemoteState = false;
+  syncSettings.version = nextVersion;
+  saveSyncSettings();
+  applyTheme();
+  applyPrintScale();
+  render();
+  updateSyncStatus();
+  if (hasLocalChanges) queueSyncOperation("sync-merge", "Слияние изменений", true);
+}
+
+function handleSyncSocketMessage(message) {
+  if (message?.type === "sync.ready") {
+    updateSyncStatus();
+    return;
+  }
+  if (message?.type === "sync.operation") {
+    applyRemoteOperationMessage(message);
+  }
 }
 
 async function loginSync(event) {
@@ -502,11 +738,13 @@ function logoutSync() {
 function startSyncPulling() {
   stopSyncPulling();
   if (!syncSettings.token) return;
+  startSyncSocket();
   syncPullTimer = window.setInterval(pullRemoteState, SYNC_PULL_INTERVAL_MS);
   pullRemoteState();
 }
 
 function stopSyncPulling() {
+  stopSyncSocket();
   if (syncPullTimer) window.clearInterval(syncPullTimer);
   syncPullTimer = null;
 }
@@ -523,6 +761,12 @@ function pushSyncOperation() {
   const snapshot = JSON.parse(serializeState());
   const sentSnapshot = JSON.stringify(snapshot);
   const baseState = lastSyncedSnapshot ? JSON.parse(lastSyncedSnapshot) : snapshot;
+  let ops = buildSyncOperations(baseState, snapshot);
+  if (ops.length > 450) ops = [{ kind: "state.replace", value: snapshot }];
+  if (!ops.length) {
+    updateSyncStatus();
+    return;
+  }
   const operation = {
     id: makeId("op"),
     clientId: syncSettings.clientId,
@@ -531,6 +775,7 @@ function pushSyncOperation() {
     detail: "",
     baseVersion: syncSettings.version,
     baseState,
+    ops,
     createdAt: new Date().toISOString(),
     state: snapshot,
   };
