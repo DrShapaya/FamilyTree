@@ -53,15 +53,55 @@ Open the app on the computer:
 http://127.0.0.1:8765
 ```
 
-To use the same tree from a phone, keep the server running and open the computer's LAN address on the phone, for example:
+To use the same tree from a phone on the same Wi-Fi/LAN, keep the server running and open the computer's LAN address on the phone, for example:
 
 ```text
 http://192.168.1.10:8765
 ```
 
-The computer and phone must be on the same Wi-Fi/LAN network. In the app, click `Локально`, enter a tree name and password, and use the same pair on the other device.
+For access from a different network, use Cloudflare Tunnel as described below. In the app, click `Локально`, enter a tree name and password, and use the same pair on the other device.
 
 Without the server, the app still works fully offline using the browser's IndexedDB storage.
+
+## Public Access With Cloudflare Tunnel
+
+Cloudflare Tunnel lets you open the local FamilyTree server from anywhere through an HTTPS address without router port forwarding.
+
+Install `cloudflared` from the official Cloudflare downloads page:
+
+```text
+https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+```
+
+Start the local sync server:
+
+```powershell
+npm start
+```
+
+In another terminal, create a temporary public tunnel:
+
+```powershell
+npm run tunnel
+```
+
+Cloudflare will print an `https://...trycloudflare.com` address. Open that address on the phone and in the app click `Локально`, then enter the same tree name and password on each device.
+
+On Windows, you can also double-click:
+
+```text
+Start FamilyTree Cloudflare Tunnel.cmd
+```
+
+That helper starts the FamilyTree server and then starts the tunnel.
+
+Important: in this mode the app is available from anywhere only while this computer is on, the FamilyTree server is running, and `cloudflared` is running.
+
+For a permanent custom domain, create a named Cloudflare Tunnel in your Cloudflare account and use `cloudflare-tunnel.example.yml` as a starting point. Point the tunnel service to:
+
+```text
+http://127.0.0.1:8765
+```
 
 ## Privacy
 

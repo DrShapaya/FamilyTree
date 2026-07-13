@@ -6,7 +6,7 @@ const express = require("express");
 const PORT = Number(process.env.PORT || 8765);
 const HOST = process.env.HOST || "0.0.0.0";
 const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, "server-data");
+const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "server-data");
 const TREES_DIR = path.join(DATA_DIR, "trees");
 const SECRET_FILE = path.join(DATA_DIR, "secret.txt");
 const PBKDF2_ITERATIONS = 210000;
@@ -33,6 +33,7 @@ function treePath(treeId) {
 
 async function ensureStorage() {
   await fs.mkdir(TREES_DIR, { recursive: true });
+  if (process.env.SERVER_SECRET) return process.env.SERVER_SECRET;
   try {
     return (await fs.readFile(SECRET_FILE, "utf8")).trim();
   } catch {
@@ -212,4 +213,5 @@ app.use(express.static(ROOT, {
 app.listen(PORT, HOST, () => {
   console.log(`FamilyTree server: http://127.0.0.1:${PORT}`);
   console.log(`LAN access: use this computer's local IP on port ${PORT}`);
+  console.log(`Storage directory: ${DATA_DIR}`);
 });
