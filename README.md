@@ -59,80 +59,11 @@ To use the same tree from a phone on the same Wi-Fi/LAN, keep the server running
 http://192.168.1.10:8765
 ```
 
-For access from a different network, use Cloudflare Tunnel as described below. In the app, click `Локально`, enter a tree name and password, and use the same pair on the other device.
+In the app, click `Локально`, enter a tree name and password, and use the same pair on the other device.
 
 Without the server, the app still works fully offline using the browser's IndexedDB storage.
 
 Sync is local-first, operation-based, and WebSocket-assisted. The browser sends concrete changes such as card upserts, card moves, link changes, guide changes, and settings patches; the server applies them and broadcasts them to other connected devices in real time. If two devices add or move different cards at the same time, the server merges those changes instead of replacing the whole tree with the last saved copy. If two devices edit the same card field at the same time, the later synced edit wins for that field.
-
-## Public Access With Cloudflare Tunnel
-
-Cloudflare Tunnel lets you open the local FamilyTree server from anywhere through an HTTPS address without router port forwarding.
-
-Install `cloudflared` from the official Cloudflare downloads page:
-
-```text
-https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
-```
-
-Start the local sync server:
-
-```powershell
-npm start
-```
-
-In another terminal, create a temporary public tunnel:
-
-```powershell
-npm run tunnel
-```
-
-Cloudflare will print an `https://...trycloudflare.com` address. Open that address on the phone and in the app click `Локально`, then enter the same tree name and password on each device.
-
-On Windows, you can also double-click:
-
-```text
-Start FamilyTree Cloudflare Tunnel.cmd
-```
-
-That helper starts the FamilyTree server and then starts the tunnel.
-
-Important: in this mode the app is available from anywhere only while this computer is on, the FamilyTree server is running, and `cloudflared` is running.
-
-For a permanent custom domain, create a named Cloudflare Tunnel in your Cloudflare account and use `cloudflare-tunnel.example.yml` as a starting point. Point the tunnel service to:
-
-```text
-http://127.0.0.1:8765
-```
-
-For this project, the prepared permanent address is:
-
-```text
-https://drshapaya.ru
-https://tree.drshapaya.ru
-```
-
-After adding `drshapaya.ru` to Cloudflare and changing the domain nameservers at the registrar, run:
-
-```powershell
-.\scripts\setup-cloudflare-named-tunnel.ps1
-```
-
-Then start the permanent tunnel with:
-
-```powershell
-.\scripts\start-cloudflare-named-tunnel.ps1
-```
-
-The permanent tunnel uses local port `8785`, so it does not conflict with temporary local servers on `8765`.
-
-No Windows service or autorun is required. Start the tunnel manually when you need public access by double-clicking:
-
-```text
-Start FamilyTree Permanent Tunnel.cmd
-```
-
-The root domain `drshapaya.ru` serves a public project page. The private tree app stays on `tree.drshapaya.ru`.
 
 ## Privacy
 
