@@ -8,6 +8,7 @@ const { WebSocketServer, WebSocket } = require("ws");
 const PORT = Number(process.env.PORT || 8765);
 const HOST = process.env.HOST || "0.0.0.0";
 const ROOT = __dirname;
+const PUBLIC_ROOT = path.join(ROOT, "public-site");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "server-data");
 const TREES_DIR = path.join(DATA_DIR, "trees");
 const SECRET_FILE = path.join(DATA_DIR, "secret.txt");
@@ -438,6 +439,22 @@ app.use((req, res, next) => {
     return res.status(404).send("Not found");
   }
   next();
+});
+
+function hostname(req) {
+  return String(req.hostname || req.headers.host || "").split(":")[0].toLowerCase();
+}
+
+function isPublicSiteHost(req) {
+  const host = hostname(req);
+  return host === "drshapaya.ru" || host === "www.drshapaya.ru";
+}
+
+app.use("/public", express.static(PUBLIC_ROOT));
+
+app.get("/", (req, res, next) => {
+  if (!isPublicSiteHost(req)) return next();
+  res.sendFile(path.join(PUBLIC_ROOT, "index.html"));
 });
 
 app.use(express.static(ROOT, {

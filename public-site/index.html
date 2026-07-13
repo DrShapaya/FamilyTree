@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DrShapaya FamilyTree</title>
+    <meta
+      name="description"
+      content="FamilyTree - локальный редактор семейного дерева с синхронизацией между устройствами."
+    />
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">
+        <span class="brand-mark">FT</span>
+        <span>DrShapaya FamilyTree</span>
+      </a>
+      <nav aria-label="Навигация">
+        <a href="#about">О проекте</a>
+        <a href="#privacy">Приватность</a>
+        <a class="tree-link" href="https://tree.drshapaya.ru">Открыть дерево</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Семейная история в одном месте</p>
+          <h1>DrShapaya FamilyTree</h1>
+          <p>
+            Веб-приложение для создания семейного дерева: карточки родственников, связи, даты,
+            места, GEDCOM, резервные копии и синхронизация между устройствами.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-action" href="https://tree.drshapaya.ru">Открыть дерево</a>
+            <a class="secondary-action" href="#about">Подробнее</a>
+          </div>
+        </div>
+        <div class="tree-visual" aria-hidden="true">
+          <span class="person p1">Нина</span>
+          <span class="person p2">Виктор</span>
+          <span class="person p3">Алексей</span>
+          <span class="person p4">Мария</span>
+          <span class="person p5">Анна</span>
+          <span class="line l1"></span>
+          <span class="line l2"></span>
+          <span class="line l3"></span>
+          <span class="line l4"></span>
+        </div>
+      </section>
+
+      <section id="about" class="content-section">
+        <div>
+          <p class="eyebrow">Возможности</p>
+          <h2>Что умеет приложение</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>Карточки людей</h3>
+            <p>Имена, даты, места, заметки, фотографии и цветовые группы.</p>
+          </article>
+          <article>
+            <h3>Связи</h3>
+            <p>Родители, дети, супруги, братья и сёстры с ручным расположением.</p>
+          </article>
+          <article>
+            <h3>Синхронизация</h3>
+            <p>Один сервер, несколько устройств и быстрые обновления через WebSocket.</p>
+          </article>
+          <article>
+            <h3>Импорт и экспорт</h3>
+            <p>JSON, GEDCOM, PNG, печать и локальные резервные копии.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="privacy" class="content-section muted">
+        <div>
+          <p class="eyebrow">Приватность</p>
+          <h2>Личные данные отделены от публичной страницы</h2>
+        </div>
+        <p>
+          Эта страница публичная. Само дерево открывается отдельно на
+          <a href="https://tree.drshapaya.ru">tree.drshapaya.ru</a> и требует имя дерева с паролем.
+        </p>
+      </section>
+
+      <section class="ad-placeholder" aria-label="Место для рекламного блока">
+        <p>Здесь можно разместить рекламный блок после одобрения сайта рекламной сетью.</p>
+      </section>
+    </main>
+
+    <footer>
+      <span>DrShapaya FamilyTree</span>
+      <a href="https://tree.drshapaya.ru">tree.drshapaya.ru</a>
+    </footer>
+  </body>
+</html>

@@ -108,6 +108,7 @@ http://127.0.0.1:8765
 For this project, the prepared permanent address is:
 
 ```text
+https://drshapaya.ru
 https://tree.drshapaya.ru
 ```
 
@@ -130,6 +131,8 @@ No Windows service or autorun is required. Start the tunnel manually when you ne
 ```text
 Start FamilyTree Permanent Tunnel.cmd
 ```
+
+The root domain `drshapaya.ru` serves a public project page. The private tree app stays on `tree.drshapaya.ru`.
 
 ## Privacy
 

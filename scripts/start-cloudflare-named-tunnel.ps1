@@ -62,5 +62,6 @@ if (-not (Test-FamilyTreeHealth -Port $Port)) {
 }
 
 Write-Host "Starting permanent Cloudflare Tunnel..."
+Write-Host "Public URL: https://drshapaya.ru"
 Write-Host "URL: https://tree.drshapaya.ru"
 & $cloudflaredExe tunnel --config $ConfigPath run

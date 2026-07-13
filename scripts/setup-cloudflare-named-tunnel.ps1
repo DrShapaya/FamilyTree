@@ -1,6 +1,8 @@
 param(
   [string]$TunnelName = "familytree",
   [string]$Hostname = "tree.drshapaya.ru",
+  [string]$PublicHostname = "drshapaya.ru",
+  [string]$WwwHostname = "www.drshapaya.ru",
   [int]$Port = 8785
 )
 
@@ -65,18 +67,27 @@ tunnel: $tunnelId
 credentials-file: "$($credentialsPath.Replace('\', '\\'))"
 
 ingress:
+  - hostname: $PublicHostname
+    service: http://127.0.0.1:$Port
+  - hostname: $WwwHostname
+    service: http://127.0.0.1:$Port
   - hostname: $Hostname
     service: http://127.0.0.1:$Port
   - service: http_status:404
 "@
 $config | Set-Content -Path $configPath -Encoding UTF8
 
+Write-Host "Routing $PublicHostname to tunnel '$TunnelName'..."
+& $cloudflaredExe tunnel route dns $TunnelName $PublicHostname
+Write-Host "Routing $WwwHostname to tunnel '$TunnelName'..."
+& $cloudflaredExe tunnel route dns $TunnelName $WwwHostname
 Write-Host "Routing $Hostname to tunnel '$TunnelName'..."
 & $cloudflaredExe tunnel route dns $TunnelName $Hostname
 
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
 Write-Host "Config: $configPath"
+Write-Host "Public URL: https://$PublicHostname"
 Write-Host "Permanent URL: https://$Hostname"
 Write-Host ""
 Write-Host "Start it with:"

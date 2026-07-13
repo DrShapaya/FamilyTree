@@ -6,6 +6,10 @@ tunnel: YOUR_TUNNEL_ID
 credentials-file: "C:\\Users\\YOUR_WINDOWS_USER\\.cloudflared\\YOUR_TUNNEL_ID.json"
 
 ingress:
+  - hostname: drshapaya.ru
+    service: http://127.0.0.1:8785
+  - hostname: www.drshapaya.ru
+    service: http://127.0.0.1:8785
   - hostname: tree.drshapaya.ru
     service: http://127.0.0.1:8785
   - service: http_status:404
