@@ -156,6 +156,7 @@ let syncPushQueue = Promise.resolve();
 let applyingRemoteState = false;
 let syncDebounceTimer = null;
 let pendingSyncReason = "";
+let lastSyncedSnapshot = "";
 
 function makeId(prefix = "p") {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -292,6 +293,103 @@ function syncBaseUrl() {
   return String(syncSettings.serverUrl || defaultSyncServerUrl()).replace(/\/+$/, "");
 }
 
+function cloneStateValue(value) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value || {}));
+}
+
+function sameStateValue(left, right) {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+function mergeObjectMap(currentMap = {}, baseMap = {}, nextMap = {}) {
+  const merged = cloneStateValue(currentMap);
+  const ids = new Set([...Object.keys(baseMap || {}), ...Object.keys(currentMap || {}), ...Object.keys(nextMap || {})]);
+  ids.forEach((id) => {
+    const baseHas = Object.prototype.hasOwnProperty.call(baseMap, id);
+    const currentHas = Object.prototype.hasOwnProperty.call(currentMap, id);
+    const nextHas = Object.prototype.hasOwnProperty.call(nextMap, id);
+    if (!baseHas && nextHas) {
+      merged[id] = cloneStateValue(nextMap[id]);
+    } else if (baseHas && !nextHas) {
+      if (!currentHas || sameStateValue(currentMap[id], baseMap[id])) delete merged[id];
+    } else if (baseHas && nextHas && !sameStateValue(nextMap[id], baseMap[id])) {
+      merged[id] = cloneStateValue(nextMap[id]);
+    }
+  });
+  return merged;
+}
+
+function mergeArrayById(currentItems = [], baseItems = [], nextItems = []) {
+  const toMap = (items) =>
+    new Map(
+      (Array.isArray(items) ? items : [])
+        .filter((item) => item && item.id)
+        .map((item) => [String(item.id), item]),
+    );
+  const currentMap = toMap(currentItems);
+  const baseMap = toMap(baseItems);
+  const nextMap = toMap(nextItems);
+  const mergedMap = new Map([...currentMap].map(([id, item]) => [id, cloneStateValue(item)]));
+  const ids = new Set([...baseMap.keys(), ...currentMap.keys(), ...nextMap.keys()]);
+  ids.forEach((id) => {
+    const baseHas = baseMap.has(id);
+    const currentHas = currentMap.has(id);
+    const nextHas = nextMap.has(id);
+    if (!baseHas && nextHas) {
+      mergedMap.set(id, cloneStateValue(nextMap.get(id)));
+    } else if (baseHas && !nextHas) {
+      if (!currentHas || sameStateValue(currentMap.get(id), baseMap.get(id))) mergedMap.delete(id);
+    } else if (baseHas && nextHas && !sameStateValue(nextMap.get(id), baseMap.get(id))) {
+      mergedMap.set(id, cloneStateValue(nextMap.get(id)));
+    }
+  });
+  return [...mergedMap.values()];
+}
+
+function mergeSettings(currentSettings = {}, baseSettings = {}, nextSettings = {}) {
+  const merged = cloneStateValue(currentSettings);
+  const keys = new Set([...Object.keys(baseSettings || {}), ...Object.keys(nextSettings || {})]);
+  keys.forEach((key) => {
+    if (!sameStateValue(nextSettings?.[key], baseSettings?.[key])) merged[key] = cloneStateValue(nextSettings[key]);
+  });
+  return merged;
+}
+
+function mergeHistory(currentHistory = [], nextHistory = []) {
+  const seen = new Set();
+  return [...(Array.isArray(nextHistory) ? nextHistory : []), ...(Array.isArray(currentHistory) ? currentHistory : [])]
+    .filter((item) => {
+      const id = String(item?.id || "");
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .slice(0, 30)
+    .map(cloneStateValue);
+}
+
+function mergeStateChanges(currentState, baseState, nextState) {
+  const current = cloneStateValue(currentState);
+  const base = cloneStateValue(baseState);
+  const next = cloneStateValue(nextState);
+  const merged = cloneStateValue(current);
+  merged.people = mergeObjectMap(current.people, base.people, next.people);
+  merged.positions = mergeObjectMap(current.positions, base.positions, next.positions);
+  merged.links = mergeArrayById(current.links, base.links, next.links).filter((link) => merged.people?.[link.from] && merged.people?.[link.to]);
+  merged.guides = mergeArrayById(current.guides, base.guides, next.guides);
+  merged.settings = mergeSettings(current.settings, base.settings, next.settings);
+  merged.history = mergeHistory(current.history, next.history);
+  Object.keys(merged.positions || {}).forEach((id) => {
+    if (!merged.people?.[id]) delete merged.positions[id];
+  });
+  if (!sameStateValue(next.rootId, base.rootId)) merged.rootId = next.rootId;
+  if (!sameStateValue(next.selectedId, base.selectedId)) merged.selectedId = next.selectedId;
+  if (!merged.people?.[merged.rootId]) merged.rootId = Object.keys(merged.people || {})[0] || "";
+  if (!merged.people?.[merged.selectedId]) merged.selectedId = merged.rootId;
+  return merged;
+}
+
 function updateSyncStatus(text = "") {
   if (!els.syncStatusLabel) return;
   const label = text || (syncSettings.token ? `Синхр: ${syncSettings.treeName}` : "Локально");
@@ -366,6 +464,7 @@ async function loginSync(event) {
       applyingRemoteState = true;
       state = normalizeState(data.state);
       lastStateSnapshot = serializeState();
+      lastSyncedSnapshot = lastStateSnapshot;
       persistState(lastStateSnapshot, { backup: true, reason: "sync-login" });
       applyingRemoteState = false;
       applyTheme();
@@ -422,6 +521,8 @@ function queueSyncOperation(type = "state-change", label = "", immediate = false
 function pushSyncOperation() {
   if (!syncSettings.token) return;
   const snapshot = JSON.parse(serializeState());
+  const sentSnapshot = JSON.stringify(snapshot);
+  const baseState = lastSyncedSnapshot ? JSON.parse(lastSyncedSnapshot) : snapshot;
   const operation = {
     id: makeId("op"),
     clientId: syncSettings.clientId,
@@ -429,6 +530,7 @@ function pushSyncOperation() {
     label: pendingSyncReason || "Изменение дерева",
     detail: "",
     baseVersion: syncSettings.version,
+    baseState,
     createdAt: new Date().toISOString(),
     state: snapshot,
   };
@@ -443,6 +545,29 @@ function pushSyncOperation() {
     )
     .then((data) => {
       syncSettings.version = Number(data.version || syncSettings.version);
+      if (data.state) {
+        const remoteState = normalizeState(cloneStateValue(data.state));
+        const remoteSnapshot = JSON.stringify(remoteState);
+        const currentSnapshot = serializeState();
+        applyingRemoteState = true;
+        if (currentSnapshot === sentSnapshot) {
+          state = remoteState;
+          lastStateSnapshot = remoteSnapshot;
+          lastSyncedSnapshot = remoteSnapshot;
+          persistState(lastStateSnapshot, { reason: "sync-push" });
+          render();
+        } else {
+          state = normalizeState(mergeStateChanges(remoteState, snapshot, JSON.parse(currentSnapshot)));
+          lastStateSnapshot = serializeState();
+          lastSyncedSnapshot = remoteSnapshot;
+          persistState(lastStateSnapshot, { reason: "sync-merge-after-push" });
+          render();
+          window.setTimeout(() => queueSyncOperation("sync-merge", "Слияние изменений", true), 0);
+        }
+        applyingRemoteState = false;
+      } else {
+        lastSyncedSnapshot = sentSnapshot;
+      }
       saveSyncSettings();
       updateSyncStatus();
     })
@@ -458,9 +583,18 @@ async function pullRemoteState() {
     const data = await syncFetch(`/api/sync/pull?since=${encodeURIComponent(syncSettings.version || 0)}`);
     const nextVersion = Number(data.version || 0);
     if (data.state && nextVersion > Number(syncSettings.version || 0)) {
+      const localSnapshot = serializeState();
+      const hasLocalChanges = Boolean(lastSyncedSnapshot) && localSnapshot !== lastSyncedSnapshot;
+      const remoteState = normalizeState(cloneStateValue(data.state));
+      const remoteSnapshot = JSON.stringify(remoteState);
       applyingRemoteState = true;
-      state = normalizeState(data.state);
+      if (hasLocalChanges) {
+        state = normalizeState(mergeStateChanges(remoteState, JSON.parse(lastSyncedSnapshot), JSON.parse(localSnapshot)));
+      } else {
+        state = remoteState;
+      }
       lastStateSnapshot = serializeState();
+      lastSyncedSnapshot = remoteSnapshot;
       persistState(lastStateSnapshot, { reason: "sync-pull" });
       applyingRemoteState = false;
       syncSettings.version = nextVersion;
@@ -472,9 +606,11 @@ async function pullRemoteState() {
       applyTheme();
       applyPrintScale();
       render();
+      if (hasLocalChanges) queueSyncOperation("sync-merge", "Слияние изменений", true);
     } else {
       syncSettings.version = nextVersion;
       saveSyncSettings();
+      if (!lastSyncedSnapshot) lastSyncedSnapshot = serializeState();
     }
     updateSyncStatus();
   } catch (error) {

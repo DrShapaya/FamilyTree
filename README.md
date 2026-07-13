@@ -63,6 +63,8 @@ For access from a different network, use Cloudflare Tunnel as described below. I
 
 Without the server, the app still works fully offline using the browser's IndexedDB storage.
 
+Sync is local-first and merge-aware. If two devices add or move different cards at the same time, the server merges those changes instead of replacing the whole tree with the last saved copy. If two devices edit the same card field at the same time, the later synced edit wins for that field.
+
 ## Public Access With Cloudflare Tunnel
 
 Cloudflare Tunnel lets you open the local FamilyTree server from anywhere through an HTTPS address without router port forwarding.
