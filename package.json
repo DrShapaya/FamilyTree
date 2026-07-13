@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "tunnel": "cloudflared tunnel --url http://127.0.0.1:8765"
+    "tunnel": "powershell -ExecutionPolicy Bypass -File scripts/start-cloudflare-tunnel.ps1"
   },
   "dependencies": {
     "express": "^4.19.2"
