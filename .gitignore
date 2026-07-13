@@ -10,4 +10,5 @@ Thumbs.db
 .git.broken/
 node_modules/
 server-data/
+.tools/
 .env

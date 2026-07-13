@@ -8,7 +8,16 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   exit 1
 }
 
-if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
+$localCloudflared = Join-Path $root ".tools\cloudflared.exe"
+$programFilesCloudflared = "C:\Program Files (x86)\cloudflared\cloudflared.exe"
+$cloudflaredCommand = Get-Command cloudflared -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $programFilesCloudflared) {
+  $cloudflaredExe = $programFilesCloudflared
+} elseif (Test-Path -LiteralPath $localCloudflared) {
+  $cloudflaredExe = $localCloudflared
+} elseif ($cloudflaredCommand) {
+  $cloudflaredExe = $cloudflaredCommand.Source
+} else {
   Write-Host "cloudflared is not installed or is not in PATH." -ForegroundColor Red
   Write-Host "Install it from: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
   exit 1
@@ -32,4 +41,4 @@ Write-Host ""
 Write-Host "Starting Cloudflare Quick Tunnel..."
 Write-Host "Copy the https://*.trycloudflare.com address shown below and open it on your phone."
 Write-Host ""
-cloudflared tunnel --url http://127.0.0.1:8765
+& $cloudflaredExe tunnel --url http://127.0.0.1:8765
