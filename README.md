@@ -33,11 +33,43 @@ Then open:
 http://127.0.0.1:8765/index.html
 ```
 
+## Run With Sync Server
+
+Install dependencies once:
+
+```powershell
+npm install
+```
+
+Start the server:
+
+```powershell
+npm start
+```
+
+Open the app on the computer:
+
+```text
+http://127.0.0.1:8765
+```
+
+To use the same tree from a phone, keep the server running and open the computer's LAN address on the phone, for example:
+
+```text
+http://192.168.1.10:8765
+```
+
+The computer and phone must be on the same Wi-Fi/LAN network. In the app, click `Локально`, enter a tree name and password, and use the same pair on the other device.
+
+Without the server, the app still works fully offline using the browser's IndexedDB storage.
+
 ## Privacy
 
 Personal tree data is stored in the browser using IndexedDB. It is not stored in this Git repository.
 
 The `.gitignore` excludes exported files such as `family-tree-*.json`, `family-tree-*.ged`, and `family-tree-*.png` to reduce the chance of accidentally committing private family data.
+
+When sync is enabled, server-side tree data is stored under `server-data/`, which is also ignored by Git.
 
 ## Project Files
 

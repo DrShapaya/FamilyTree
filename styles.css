@@ -333,6 +333,16 @@ body.theme-dark .compact-select {
   box-shadow: 0 10px 24px rgba(31, 94, 89, 0.2);
 }
 
+.sync-button {
+  background: #33443f;
+  border-color: #33443f;
+}
+
+.sync-button.sync-connected {
+  background: #1f5e59;
+  border-color: #1f5e59;
+}
+
 .icon-button:active,
 .text-button:active,
 .ghost-button:active,
@@ -1002,6 +1012,86 @@ body.admin-collapsed .admin-panel-header {
   place-items: center;
   padding: 28px;
   background: rgba(22, 25, 24, 0.74);
+}
+
+.sync-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(22, 25, 24, 0.62);
+}
+
+.sync-modal[hidden] {
+  display: none;
+}
+
+.sync-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(430px, calc(100vw - 36px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.sync-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sync-dialog label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.sync-dialog input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  outline: 0;
+}
+
+.sync-dialog input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 125, 117, 0.14);
+}
+
+.sync-message {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.sync-message.sync-error {
+  border-color: rgba(163, 61, 53, 0.26);
+  background: #fff7f4;
+  color: var(--danger);
+}
+
+.sync-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .photo-modal[hidden] {

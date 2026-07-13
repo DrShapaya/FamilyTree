@@ -190,6 +190,7 @@
           <button id="undoBtn" class="icon-button" title="Отменить" aria-label="Отменить"><svg class="ui-icon" aria-hidden="true"><use href="#icon-undo"></use></svg></button>
           <button id="redoBtn" class="icon-button" title="Вернуть" aria-label="Вернуть"><svg class="ui-icon" aria-hidden="true"><use href="#icon-redo"></use></svg></button>
           <button id="saveTreeBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-save"></use></svg><span>Сохранить</span></button>
+          <button id="syncBtn" class="text-button sync-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-link"></use></svg><span id="syncStatusLabel">Локально</span></button>
           <button id="autoLayoutBtn" class="text-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-layout"></use></svg><span>Упорядочить</span></button>
           <button id="fitBtn" class="icon-button" title="Показать всё" aria-label="Показать всё"><svg class="ui-icon" aria-hidden="true"><use href="#icon-fit"></use></svg></button>
           <button id="zoomOutBtn" class="icon-button" title="Уменьшить" aria-label="Уменьшить"><svg class="ui-icon" aria-hidden="true"><use href="#icon-minus"></use></svg></button>
@@ -487,6 +488,35 @@
         <input id="printScaleInput" type="range" min="55" max="130" value="100" />
       </label>
       <button id="exitPrintModeBtn" class="ghost-button" type="button">Выйти</button>
+    </div>
+
+    <div id="syncModal" class="sync-modal" hidden>
+      <form id="syncForm" class="sync-dialog">
+        <div class="sync-dialog-header">
+          <div>
+            <p class="eyebrow">Синхронизация</p>
+            <h2>Вход в дерево</h2>
+          </div>
+          <button id="closeSyncModalBtn" class="icon-button" type="button" title="Закрыть" aria-label="Закрыть"><svg class="ui-icon" aria-hidden="true"><use href="#icon-x"></use></svg></button>
+        </div>
+        <label>
+          Сервер
+          <input id="syncServerInput" name="server" type="url" placeholder="http://192.168.1.10:8765" />
+        </label>
+        <label>
+          Имя дерева
+          <input id="syncTreeNameInput" name="treeName" type="text" autocomplete="off" placeholder="family" />
+        </label>
+        <label>
+          Пароль
+          <input id="syncPasswordInput" name="password" type="password" autocomplete="current-password" />
+        </label>
+        <p id="syncMessage" class="sync-message">Без сервера приложение продолжает работать локально на этом устройстве.</p>
+        <div class="sync-actions">
+          <button id="syncLogoutBtn" class="ghost-button" type="button">Отключить</button>
+          <button class="text-button" type="submit">Войти</button>
+        </div>
+      </form>
     </div>
 
     <script src="./tree-layout.js"></script>

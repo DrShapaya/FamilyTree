@@ -4,8 +4,10 @@ const DB_VERSION = 1;
 const DB_STATE_STORE = "state";
 const DB_BACKUP_STORE = "backups";
 const DB_STATE_KEY = "current";
+const SYNC_STORAGE_KEY = "family-tree-sync-v1";
 const BACKUP_LIMIT = 12;
 const BACKUP_INTERVAL_MS = 5 * 60 * 1000;
+const SYNC_PULL_INTERVAL_MS = 3500;
 const GRID = 40;
 const CARD_W = GRID * 7;
 const CARD_H = GRID * 3;
@@ -44,6 +46,8 @@ const els = {
   undo: document.querySelector("#undoBtn"),
   redo: document.querySelector("#redoBtn"),
   saveTree: document.querySelector("#saveTreeBtn"),
+  sync: document.querySelector("#syncBtn"),
+  syncStatusLabel: document.querySelector("#syncStatusLabel"),
   autoLayout: document.querySelector("#autoLayoutBtn"),
   selectedTitle: document.querySelector("#selectedTitle"),
   setRoot: document.querySelector("#setRootBtn"),
@@ -89,6 +93,14 @@ const els = {
   printControls: document.querySelector("#printControls"),
   printScale: document.querySelector("#printScaleInput"),
   exitPrintMode: document.querySelector("#exitPrintModeBtn"),
+  syncModal: document.querySelector("#syncModal"),
+  syncForm: document.querySelector("#syncForm"),
+  syncServer: document.querySelector("#syncServerInput"),
+  syncTreeName: document.querySelector("#syncTreeNameInput"),
+  syncPassword: document.querySelector("#syncPasswordInput"),
+  syncMessage: document.querySelector("#syncMessage"),
+  syncLogout: document.querySelector("#syncLogoutBtn"),
+  closeSyncModal: document.querySelector("#closeSyncModalBtn"),
   fit: document.querySelector("#fitBtn"),
   zoomIn: document.querySelector("#zoomInBtn"),
   zoomOut: document.querySelector("#zoomOutBtn"),
@@ -138,6 +150,12 @@ let dbPromise = null;
 let persistQueue = Promise.resolve();
 let lastBackupAt = 0;
 let cardClipboard = null;
+let syncSettings = loadSyncSettings();
+let syncPullTimer = null;
+let syncPushQueue = Promise.resolve();
+let applyingRemoteState = false;
+let syncDebounceTimer = null;
+let pendingSyncReason = "";
 
 function makeId(prefix = "p") {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -238,6 +256,231 @@ function createDemoState() {
       [sibling]: { x: 2640, y: 1600 },
     },
   };
+}
+
+function loadSyncSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY) || "{}");
+    return {
+      clientId: saved.clientId || makeId("client"),
+      serverUrl: saved.serverUrl || defaultSyncServerUrl(),
+      treeName: saved.treeName || "",
+      token: saved.token || "",
+      version: Number(saved.version || 0),
+    };
+  } catch {
+    return {
+      clientId: makeId("client"),
+      serverUrl: defaultSyncServerUrl(),
+      treeName: "",
+      token: "",
+      version: 0,
+    };
+  }
+}
+
+function saveSyncSettings() {
+  localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(syncSettings));
+}
+
+function defaultSyncServerUrl() {
+  if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+  return "http://127.0.0.1:8765";
+}
+
+function syncBaseUrl() {
+  return String(syncSettings.serverUrl || defaultSyncServerUrl()).replace(/\/+$/, "");
+}
+
+function updateSyncStatus(text = "") {
+  if (!els.syncStatusLabel) return;
+  const label = text || (syncSettings.token ? `Синхр: ${syncSettings.treeName}` : "Локально");
+  els.syncStatusLabel.textContent = label;
+  els.sync?.classList.toggle("sync-connected", Boolean(syncSettings.token));
+}
+
+function setSyncMessage(text, isError = false) {
+  if (!els.syncMessage) return;
+  els.syncMessage.textContent = text;
+  els.syncMessage.classList.toggle("sync-error", isError);
+}
+
+function openSyncModal() {
+  els.syncServer.value = syncSettings.serverUrl || defaultSyncServerUrl();
+  els.syncTreeName.value = syncSettings.treeName || "";
+  els.syncPassword.value = "";
+  setSyncMessage(
+    syncSettings.token
+      ? `Подключено к дереву "${syncSettings.treeName}". Можно открыть этот же адрес на телефоне.`
+      : "Без сервера приложение продолжает работать локально на этом устройстве.",
+  );
+  els.syncModal.hidden = false;
+}
+
+function closeSyncModal() {
+  els.syncModal.hidden = true;
+}
+
+async function syncFetch(pathname, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (syncSettings.token) headers.Authorization = `Bearer ${syncSettings.token}`;
+  const response = await fetch(`${syncBaseUrl()}${pathname}`, {
+    ...options,
+    headers,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
+}
+
+async function loginSync(event) {
+  event.preventDefault();
+  const serverUrl = els.syncServer.value.trim() || defaultSyncServerUrl();
+  const treeName = els.syncTreeName.value.trim();
+  const password = els.syncPassword.value;
+  if (!treeName || password.length < 4) {
+    setSyncMessage("Введите имя дерева и пароль от 4 символов.", true);
+    return;
+  }
+
+  setSyncMessage("Подключаюсь...");
+  try {
+    syncSettings.serverUrl = serverUrl.replace(/\/+$/, "");
+    const data = await syncFetch("/api/trees/login", {
+      method: "POST",
+      body: JSON.stringify({
+        treeName,
+        password,
+        initialState: state,
+      }),
+    });
+    syncSettings.token = data.token;
+    syncSettings.treeName = data.treeName || treeName;
+    syncSettings.version = Number(data.version || 0);
+    saveSyncSettings();
+
+    if (data.state) {
+      applyingRemoteState = true;
+      state = normalizeState(data.state);
+      lastStateSnapshot = serializeState();
+      persistState(lastStateSnapshot, { backup: true, reason: "sync-login" });
+      applyingRemoteState = false;
+      applyTheme();
+      applyPrintScale();
+      render();
+      fitTree();
+    } else {
+      queueSyncOperation("sync-initial", "Первичная синхронизация", true);
+    }
+
+    updateSyncStatus();
+    startSyncPulling();
+    setSyncMessage(`Готово. Дерево "${syncSettings.treeName}" синхронизируется.`);
+    window.setTimeout(closeSyncModal, 700);
+  } catch (error) {
+    setSyncMessage(`Не удалось войти: ${error.message}`, true);
+    updateSyncStatus("Ошибка");
+  }
+}
+
+function logoutSync() {
+  syncSettings = {
+    clientId: syncSettings.clientId || makeId("client"),
+    serverUrl: syncSettings.serverUrl || defaultSyncServerUrl(),
+    treeName: "",
+    token: "",
+    version: 0,
+  };
+  saveSyncSettings();
+  stopSyncPulling();
+  updateSyncStatus();
+  setSyncMessage("Синхронизация отключена. Приложение работает локально.");
+}
+
+function startSyncPulling() {
+  stopSyncPulling();
+  if (!syncSettings.token) return;
+  syncPullTimer = window.setInterval(pullRemoteState, SYNC_PULL_INTERVAL_MS);
+  pullRemoteState();
+}
+
+function stopSyncPulling() {
+  if (syncPullTimer) window.clearInterval(syncPullTimer);
+  syncPullTimer = null;
+}
+
+function queueSyncOperation(type = "state-change", label = "", immediate = false) {
+  if (!syncSettings.token || applyingRemoteState) return;
+  pendingSyncReason = label || type || pendingSyncReason;
+  window.clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = window.setTimeout(pushSyncOperation, immediate ? 0 : 700);
+}
+
+function pushSyncOperation() {
+  if (!syncSettings.token) return;
+  const snapshot = JSON.parse(serializeState());
+  const operation = {
+    id: makeId("op"),
+    clientId: syncSettings.clientId,
+    type: "state-change",
+    label: pendingSyncReason || "Изменение дерева",
+    detail: "",
+    baseVersion: syncSettings.version,
+    createdAt: new Date().toISOString(),
+    state: snapshot,
+  };
+  pendingSyncReason = "";
+  updateSyncStatus("Синхр...");
+  syncPushQueue = syncPushQueue
+    .then(() =>
+      syncFetch("/api/sync/push", {
+        method: "POST",
+        body: JSON.stringify({ operation }),
+      }),
+    )
+    .then((data) => {
+      syncSettings.version = Number(data.version || syncSettings.version);
+      saveSyncSettings();
+      updateSyncStatus();
+    })
+    .catch((error) => {
+      console.warn("Не удалось отправить синхронизацию", error);
+      updateSyncStatus("Офлайн");
+    });
+}
+
+async function pullRemoteState() {
+  if (!syncSettings.token) return;
+  try {
+    const data = await syncFetch(`/api/sync/pull?since=${encodeURIComponent(syncSettings.version || 0)}`);
+    const nextVersion = Number(data.version || 0);
+    if (data.state && nextVersion > Number(syncSettings.version || 0)) {
+      applyingRemoteState = true;
+      state = normalizeState(data.state);
+      lastStateSnapshot = serializeState();
+      persistState(lastStateSnapshot, { reason: "sync-pull" });
+      applyingRemoteState = false;
+      syncSettings.version = nextVersion;
+      saveSyncSettings();
+      pendingLineFrom = "";
+      selectedLinkId = "";
+      openMenuId = "";
+      selectedIds.clear();
+      applyTheme();
+      applyPrintScale();
+      render();
+    } else {
+      syncSettings.version = nextVersion;
+      saveSyncSettings();
+    }
+    updateSyncStatus();
+  } catch (error) {
+    console.warn("Не удалось получить синхронизацию", error);
+    updateSyncStatus("Офлайн");
+  }
 }
 
 function openDatabase() {
@@ -344,6 +587,9 @@ async function initializeStorage() {
   } catch (error) {
     console.warn("Не удалось загрузить IndexedDB", error);
     if (els.modeStatus) els.modeStatus.textContent = "Хранилище недоступно";
+  } finally {
+    updateSyncStatus();
+    startSyncPulling();
   }
 }
 
@@ -570,6 +816,7 @@ function saveState(options = {}) {
   }
   lastStateSnapshot = nextSnapshot;
   persistState(nextSnapshot, { reason: action || "autosave" });
+  queueSyncOperation("state-change", action || detail || "Изменение дерева");
   updateHistoryButtons();
   if (showStatus) showSaveStatus();
 }
@@ -582,6 +829,7 @@ function restoreSnapshot(snapshot, targetStack) {
   applyPrintScale();
   lastStateSnapshot = serializeState();
   persistState(lastStateSnapshot, { reason: "restore" });
+  queueSyncOperation("restore", "Восстановление состояния", true);
   pendingLineFrom = "";
   selectedLinkId = "";
   openMenuId = "";
@@ -611,6 +859,7 @@ function showSaveStatus() {
 function manualSave() {
   lastStateSnapshot = serializeState();
   persistState(lastStateSnapshot, { backup: true, reason: "manual" });
+  queueSyncOperation("manual-save", "Ручное сохранение", true);
   updateHistoryButtons();
   showSaveStatus();
 }
@@ -2741,6 +2990,13 @@ function bindEvents() {
   els.undo.addEventListener("click", undoAction);
   els.redo.addEventListener("click", redoAction);
   els.saveTree.addEventListener("click", manualSave);
+  els.sync.addEventListener("click", openSyncModal);
+  els.syncForm.addEventListener("submit", loginSync);
+  els.syncLogout.addEventListener("click", logoutSync);
+  els.closeSyncModal.addEventListener("click", closeSyncModal);
+  els.syncModal.addEventListener("click", (event) => {
+    if (event.target === els.syncModal) closeSyncModal();
+  });
   els.autoLayout.addEventListener("click", runAutoLayout);
   els.editLock.addEventListener("change", (event) => {
     state.settings.editLocked = event.target.checked;
@@ -2900,6 +3156,10 @@ function bindEvents() {
     if (event.key === "Escape") {
       if (!els.photoModal.hidden) {
         closePhotoPreview();
+        return;
+      }
+      if (!els.syncModal.hidden) {
+        closeSyncModal();
         return;
       }
       if (printModeEnabled) {
